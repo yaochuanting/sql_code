@@ -3,6 +3,7 @@ select x.stats_date 统计日期,
 	   xy.staffs 月初抗标人数,
 	   xz.new_req 新线索触碰量,
 	   y.new_keys 获取新线索量,
+	   yx.new_apply_num 新线索申请设班单量,
 	   z.new_plan_num 新线索试听邀约量,
 	   z.new_trial_exp 新线索体验课出席量,
 	   z.new_trial_num 新线索试听出席量,
@@ -11,6 +12,7 @@ select x.stats_date 统计日期,
 	   xx.new_deal_amount 新线索总成单额,
 	   xz.all_oc_req 大盘oc触碰量,
 	   y.all_oc_keys 大盘oc获取量,
+	   yx.all_oc_apply_num 大盘oc申请设班单量,
 	   z.all_oc_plan_num 大盘oc试听邀约量,
 	   z.all_oc_trial_exp 大盘oc体验课出席量,
 	   z.all_oc_trial_num 大盘oc试听出席量,
@@ -80,6 +82,33 @@ left join (
 
              group by region_name, stats_date
 			 ) as y on y.region_name = x.region_name and y.stats_date = x.stats_date
+
+
+left join (
+			select  date_sub(curdate(),interval 1 day) stats_date,
+					bb.region_name,
+			  		count(distinct case when bb.key_attr='new' then bb.student_intention_id end) as new_apply_num,
+			        count(distinct case when bb.key_attr='all_oc' then bb.student_intention_id end) as all_oc_apply_num
+
+			from(
+					select  lpo.student_intention_id, lpo.apply_user_id, s.student_no,
+							case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then 'new' else 'all_oc' end key_attr,
+							concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
+					from hfjydb.lesson_plan_order lpo
+					left join hfjydb.lesson_relation lr on lpo.order_id = lr.order_id
+					left join hfjydb.lesson_plan lp on lr.plan_id = lp.lesson_plan_id
+					left join hfjydb.view_student s on s.student_intention_id = lpo.student_intention_id
+					inner join bidata.charlie_dept_month_end cdme on cdme.user_id = lpo.apply_user_id 
+							   and cdme.stats_date = curdate() and cdme.class = '销售'
+							   and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+					where lp.lesson_type = 2
+						  and lpo.apply_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+						  and lpo.apply_time < curdate()
+						  and s.account_type = 1
+						  ) as bb
+			group by stats_date, bb.region_name
+			) as yx on yx.stats_date = x.stats_date
+                       and yx.region_name = x.region_name
 
 left join (
              select
