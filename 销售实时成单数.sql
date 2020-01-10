@@ -1,18 +1,23 @@
-set @curRank := 0;
-
 select  t.*,
         @curRank := @curRank + 1 AS rank
 
 from(        
 
 
-        select  t3.class as 类型, t3.region as 区, t3.department as 部, t3.department_name as 部门名称,
+        select  t3.class as 类型, t3.region as 区, t3.department as 部, t3.department_name as 部门名称, t2.manager as 经理,
                 t2.order_number as 订单数指标, t4.lastmonth_order as 上月同期订单数,
                 t1.tomonth_order as 当月总订单数, t1.tomonth_amount as 当月总订单额,
-                t1.today_order as 今日订单数,t1.achieve_rate as 月应完标率
+                t1.today_order as 今日订单数,t1.achieve_rate as 月应完标率, t2.number as 抗标人数
 
         from( 
-              select cdme.class, cdme.branch, cdme.center, cdme.region, cdme.department, cdme.grp, cdme.department_name
+              select cdme.class, cdme.branch, cdme.center, 
+                     case when cdme.department_name like '销售考核_组' then '考核部'
+                          when cdme.department_name like '%待分配部%' then '待分配部'
+                     else cdme.region end region,
+                     case when cdme.department_name like '销售考核_组' then cdme.grp 
+                          when cdme.department_name like '%待分配%' then '待分配部'
+                     else cdme.department end department,
+                     cdme.department_name
               from bidata.charlie_dept_month_end cdme 
               where cdme.stats_date = curdate() and cdme.class = '销售'
                     and cdme.department_name like '销售_区%'
@@ -65,7 +70,8 @@ from(
             (select     
                 st.group_name,
                 st.number,
-                st.order_number
+                st.order_number,
+                st.manager
             from bidata.sales_tab st
             where st.type = 'normal'
         ) t2 on t3.department_name = t2.group_name
@@ -105,12 +111,13 @@ from(
                                           and ui.account_type = 1  -- 剔除测试数据
                                     group by tcp.contract_id
                                     having real_pay_sum >= contract_amount 
-                                           and max_pay_date >= date_sub(date_format(curdate(),'%Y-%m-01'),interval 1 month)
+                                           and date(max_pay_date) >= date_sub(date_format(curdate(),'%Y-%m-01'),interval 1 month)
+                                           and date(max_pay_date) <= date_sub(curdate(),interval 1 month)
                                             ) as a
                     group by a.department_name
                     ) as t4 on t4.department_name = t3.department_name
 
         where not(t1.department_name is null and t2.group_name is null)
-        ) as t
+        ) as t,  (select @curRank := 0) p
 
 order by (t.当月总订单数/t.订单数指标) desc;
