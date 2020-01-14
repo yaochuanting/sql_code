@@ -1,4 +1,5 @@
-select  c.cityname,
+select  c.provincename,
+		c.cityname,
 		count(tcr.student_intention_id) as call_cnt,
         count(case when tcr.status=33 then tcr.student_intention_id else null end) as bridge_cnt,
         count(tcr.student_intention_id)/count(case when tcr.status=33 then tcr.student_intention_id else null end) as bridge_rate
