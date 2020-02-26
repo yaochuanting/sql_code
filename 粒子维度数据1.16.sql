@@ -1,11 +1,11 @@
 select 	t.month,
 		count(t.student_intention_id) as key_num,
 		sum(t.submit_to_view_time) as submit_to_view_time,
-		count(case when t.min_view_time is not null then t.student_intention_id else null end) as view_num,
+		count(t.submit_to_view_time) as view_num,
 		sum(t.view_to_pool_time) as view_to_pool_time,
-		count(case when t.min_into_pool_date is not null then t.student_intention_id else null end) as into_pool_num,
+		count(t.view_to_pool_time) as into_pool_num,
 		sum(t.view_to_bridge_time) as view_to_bridge_time,
-		count(case when min_bridge_time is not null then t.student_intention_id else null end) as bridge_num,
+		count(t.view_to_bridge_time) as bridge_num,
 		sum(ifnull(t.view_to_bridge_tcr_call_cnt,0)+ifnull(t.view_to_bridge_wr_call_cnt,0)) as view_to_bridge_call_cnt,
 		count(case when t.min_bridge_time is null then t.student_intention_id else null end) as no_bridge_num,
 		count(case when t.call_cnt=0 and t.min_bridge_time is null then t.student_intention_id else null end) as call_0_cnt,
@@ -21,16 +21,22 @@ from(
 			select 	date_format(x.submit_time, '%Y-%m') as month,
 					x.student_intention_id,
 					x.submit_time,
-					x.min_view_time,
+					case when date_format(x.min_view_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					     then x.min_view_time else null end as min_view_time,
 					case when x.min_into_pool_date>=x.min_view_time
+					          and date_format(x.min_view_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
 					     then timestampdiff(second,x.submit_time,x.min_view_time)
 					else null end as submit_to_view_time,
-					x.min_into_pool_date,
+					case when date_format(x.min_into_pool_date,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					     then x.min_into_pool_date else null end as min_into_pool_date,
 					case when x.min_into_pool_date>=x.min_view_time
+					          and date_format(x.min_into_pool_date,'%Y%m')=date_format(x.submit_time,'%Y%m')
 						 then timestampdiff(second,x.min_view_time,x.min_into_pool_date)
 					else null end as view_to_pool_time,
-					x.min_bridge_time,
+					case when date_format(x.min_bridge_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					     then x.min_bridge_time else null end as min_bridge_time,
 					case when x.min_bridge_time>=x.min_view_time
+					          and date_format(x.min_bridge_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
 						 then timestampdiff(second,x.min_view_time,x.min_bridge_time)
 					else null end as view_to_bridge_time,
 					ifnull(y.tcr_call_cnt,0)+ifnull(z.wr_call_cnt,0) as call_cnt,  -- 总拨打次数
@@ -42,7 +48,10 @@ from(
 					            and cdme.date>='2019-10-01' and cdme.name<>'张小影'
 					 where tcr.start_time>=x.min_view_time and tcr.start_time<=x.min_bridge_time
 					       and tcr.student_intention_id=x.student_intention_id
-					       and tcr.call_type=1) as view_to_bridge_tcr_call_cnt,
+					       and tcr.call_type=1
+					       and date_format(x.min_view_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					       and date_format(x.min_bridge_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					       ) as view_to_bridge_tcr_call_cnt,
 			 		
 			 		(select count(wr.student_intention_id)
 			 		 from bidata.will_work_phone_call_recording wr
@@ -51,7 +60,10 @@ from(
 					            and cdme.date>='2019-10-01' and cdme.name<>'张小影'
 					 where wr.begin_time>=x.min_view_time and wr.begin_time<=x.min_bridge_time
 					 	   and wr.student_intention_id=x.student_intention_id
-					       and wr.is_call_out='True') as view_to_bridge_wr_call_cnt
+					       and wr.is_call_out='True'
+					       and date_format(x.min_view_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					       and date_format(x.min_bridge_time,'%Y%m')=date_format(x.submit_time,'%Y%m')
+					       ) as view_to_bridge_wr_call_cnt
 
 
 

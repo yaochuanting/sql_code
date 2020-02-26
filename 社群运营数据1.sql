@@ -1,7 +1,8 @@
-select ww.user_id, u3.job_number, u3.name, sd3.department_name, 
-       ww.student_no, ww.chat_title, s.name, 
-       c.provincename, c.cityname,
-       s.exam_year,
+select ww.user_id 加微信的销售id, u3.job_number 加微信的销售员编, u3.name 加微信的销售姓名, sd3.department_name 加微信的销售当前部门,
+		ww.wechat_friend_pass_time 微信通过时间, 
+       ww.student_no 学生编号, ww.chat_title 微信名, s.name 学生姓名, 
+       c.provincename 省份, c.cityname 城市,
+       s.exam_year 高考年份,
        case  when month(curdate()) >=7 then
 	        case s.exam_year - year(curdate())
 	        	  when 12 then    '小一'
@@ -32,19 +33,23 @@ select ww.user_id, u3.job_number, u3.name, sd3.department_name,
 		          when 1 then    '高二'
 		          when 0 then    '高三'
 		    ELSE s.exam_year END
-    END grade,
-    t1.adjust_start_time,
-	t1.subject_name,
-	t1.adjust_start_time,
+    END 年级,
+    t1.adjust_start_time 试听课上课时间,
+	t1.subject_name 学科,
 	case  when t1.is_trial=1 then '出席' 
-	      when t1.is_trial=0 then '跳票' end is_trial,
-	case  when t2.contract_id is not null then '成单' else '未成单' end is_deal,
-	u1.job_number,
-	u1.name as track_sale_name,
-	sd1.department_name,
-	u2.job_number,
-	u2.name as track_assistant_name,
-	sd2.department_name
+	      when t1.is_trial=0 then '跳票' end 是否出席,
+	case  when t2.contract_id is not null then '成单' else '未成单' end 是否成单,
+	u1.job_number 线索的当前跟进人员编,
+	u1.name 线索的当前跟进人姓名,
+	sd1.department_name 线索当前跟进人部门,
+	u2.job_number 当前班主任员编,
+	u2.name 当前班主任姓名,
+	sd2.department_name 当前班主任所在部门,
+	t3.max_pass_time 最后一次加微信时间,
+	u3.job_number 最后沟通销售员编,
+	u3.name 最后沟通销售姓名,
+	sd3.department_name 最后沟通销售部门
+
 	
 
 
@@ -105,4 +110,20 @@ left join (
 			group by tc.contract_id, tc.submit_user_id
 			) as t2 on t2.submit_user_id=ww.user_id
                        and t2.student_intention_id=s.student_intention_id
+left join (
+			select ww.wechat_account_id, ww.user_id, a.max_pass_time 
+			from bidata.will_work_phone_wechat_friend ww
+			inner join (
+						select  max(ww.wechat_friend_pass_time) as max_pass_time,
+								ww.wechat_account_id
+						from bidata.will_work_phone_wechat_friend ww
+						group by ww.wechat_account_id
+						) as a on a.max_pass_time=ww.wechat_friend_pass_time
+			                      and a.wechat_account_id=ww.wechat_account_id
+			group by ww.wechat_account_id, ww.user_id
+			) as t3 on t3.wechat_account_id=ww.wechat_account_id
+
+left join view_user_info u4 on u4.user_id = t3.user_id
+left join sys_user_role sur4 on u4.user_id=sur4.user_id
+left join sys_role sr4 on sur4.role_id=sr4.role_id
 where ww.wechat_friend_pass_time>='2019-06-01'
