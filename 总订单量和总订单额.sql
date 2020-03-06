@@ -1,8 +1,9 @@
-select  a.class as `部门`,
-        case when a.new_sign=0 and a.class='学管' then '续费' else '新签' end as `新签/续费`,
-        sum(case when a.period > 0 then 1 else 0 end) as `实际订单数`,
-        sum(case when a.period >= 60 then 1 else 0.5 end) as `绩效订单数`,
-        sum(contract_amount) as `总订单额`
+select  a.class as '部门',
+        date(a.last_pay_date) '完款日期',
+        case when a.new_sign=0 and a.class='CR' then '续费' else '新签' end as '新签/续费',
+        sum(case when a.period > 0 then 1 else 0 end) as '实际订单数',
+        sum(case when a.period >= 60 then 1 else 0.5 end) as '绩效订单数',
+        sum(contract_amount) as '总订单额'
 
 from(
         select
@@ -24,8 +25,7 @@ from(
               and ui.account_type = 1
         group by tcp.contract_id
         having real_pay_sum >= contract_amount
-               and date(last_pay_date) >= date_format(curdate(),'%Y-%m-01')
+               and date(last_pay_date) >= '2020-01-01'
                and date(last_pay_date) <= curdate()
         ) as a
-
-group by `部门`, `新签/续费`
+group by a.class,date(a.last_pay_date),case when a.new_sign=0 and a.class='学管' then '续费' else '新签' end
