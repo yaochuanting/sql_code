@@ -1,5 +1,5 @@
 select  now() as 更新时间,
-				concat(ifnull(t1.city,''),ifnull(t1.region,'')) as 中心,
+        concat(ifnull(t1.center,''),ifnull(t1.region,'')) as 区,
         sum(t2.today_rec_order) as 今日转介绍订单数,  sum(t2.k_today_rec_order) as 今日转介绍绩效订单数,
         sum(t2.tomonth_rec_order) as 当月转介绍订单数, sum(t2.k_tomonth_rec_order) as 当月转介绍绩效订单数,
         sum(t2.today_rec_amount) as 今日转介绍订单额, sum(t2.tomonth_rec_amount) as 当月转介绍订单额,
@@ -9,18 +9,10 @@ select  now() as 更新时间,
         sum(t2.tomonth_amount) as 当月订单额
 
 from( 
-      select cdme.class, cdme.city, cdme.branch, 
-             cdme.center, 
-             case when cdme.department_name like '%考核%' then '考核组'
-                  when cdme.department_name like '%待分配%' then '待分配部'
-                  else cdme.region end as region, 
-             cdme.department,
-             cdme.department_name
+      select cdme.class, cdme.center, cdme.region, cdme.department, cdme.department_name
       from bidata.charlie_dept_month_end cdme 
-      where cdme.stats_date = curdate() and cdme.class = '销售'
-            and cdme.department_name like '销售_区%'
-            or cdme.department_name like '%销售考核待分配部%'
-            or cdme.department_name like '销售考核_组'
+      where cdme.stats_date = curdate() and cdme.class = 'CC'
+            and cdme.department_name like 'CC%'
       group by cdme.department_name
       ) as t1
 
@@ -55,7 +47,7 @@ left join (
                             left join hfjydb.view_user_info ui on ui.user_id = tc.submit_user_id 
                             left join hfjydb.view_student s on s.student_intention_id=tc.student_intention_id
                             inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tc.submit_user_id
-                                       and cdme.stats_date = curdate() and cdme.class = '销售'    
+                                       and cdme.stats_date = curdate() and cdme.class = 'CC'    
                             where tcp.pay_status in (2,4) 
                                   and tc.status <> 8  -- 剔除合同终止和废弃
                                   and ui.account_type = 1  -- 剔除测试数据
@@ -75,10 +67,10 @@ left join (select
                 st.manager
             from bidata.sales_tab st
             where st.type = 'normal'
-                  and st.group_name like '销售%'
+                  and st.group_name like 'CC%'
         ) t3 on t1.department_name = t3.group_name
 
 where not(t2.department_name is null and t3.group_name is null)
 
-group by 中心
+group by 区
 order by 当月订单额 desc
