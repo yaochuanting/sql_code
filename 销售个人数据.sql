@@ -14,11 +14,11 @@ from(
                        date(min(crl.opt_time)) as login_time
                 from bidata.charlie_dept_history cd
                 left join view_user_info ui on ui.user_id = cd.user_id
-                LEFT JOIN sys_change_role_log crl on crl.user_id=cd.user_id
+                left join sys_change_role_log crl on crl.user_id=cd.user_id
                 inner join bidata.charlie_dept_month_end cdme on cdme.user_id = cd.user_id
                            and cdme.class = 'CC' and cdme.stats_date = curdate()
                            and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-                where (cd.department_name like 'CC%')
+                where (cd.department_name like 'CC%' or cd.department_name like '销售%')
                        and cd.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                        and cd.date < curdate()
                 group by cd.date, cd.user_id, cdme.job_number, cdme.name, cdme.department_name

@@ -29,23 +29,22 @@ select x.stats_date 统计日期,
 	   
 	   
 			
-from (			
-			
+from (					
 			select  date_sub(curdate(),interval 1 day) stats_date,
-					concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
+					concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
 			from bidata.charlie_dept_month_end cdme
 			where cdme.stats_date = curdate()
-				  and cdme.class = '销售'
+				  and cdme.class = 'CC'
 				  and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+				  and cdme.department_name like 'CC%'
 			group by stats_date, region_name
-			having region_name like '上海_区'
-				   or region_name = '销售考核'
-				   ) as x
+			) as x
+
 
 left join (
              select 
                       date_sub(curdate(),interval 1 day) stats_date,
-	                  concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+	                  concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
 	                  count(distinct intention_id) all_keys, -- 获取的总线索量
                       count(distinct case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 			                              then intention_id end) new_keys, -- 获取的新线索量
@@ -59,7 +58,7 @@ left join (
                        select tpel.track_userid, tpel.intention_id, tpel.into_pool_date, ui.name distri_user
                        from hfjydb.tms_pool_exchange_log tpel
                        inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tpel.track_userid
-	                              and cdme.stats_date = curdate() and cdme.class = '销售'
+	                              and cdme.stats_date = curdate() and cdme.class = 'CC'
 	                              and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                        left join hfjydb.view_user_info ui on ui.user_id = tpel.create_userid
                        where tpel.into_pool_date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
@@ -68,7 +67,7 @@ left join (
                        select tnn.user_id as track_userid, tnn.student_intention_id as intention_id, tnn.create_time as into_pool_date, 'OC分配账号' distri_user
                        from hfjydb.tms_new_name_get_log tnn
                        inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tnn.user_id
-	                              and cdme.stats_date = curdate() and cdme.class = '销售'
+	                              and cdme.stats_date = curdate() and cdme.class = 'CC'
 	                              and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                        where tnn.create_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 	                         and tnn.create_time < curdate()
@@ -93,13 +92,13 @@ left join (
 			from(
 					select  lpo.student_intention_id, lpo.apply_user_id, s.student_no,
 							case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then 'new' else 'all_oc' end key_attr,
-							concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
+							concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
 					from hfjydb.lesson_plan_order lpo
 					left join hfjydb.lesson_relation lr on lpo.order_id = lr.order_id
 					left join hfjydb.lesson_plan lp on lr.plan_id = lp.lesson_plan_id
 					left join hfjydb.view_student s on s.student_intention_id = lpo.student_intention_id
 					inner join bidata.charlie_dept_month_end cdme on cdme.user_id = lpo.apply_user_id 
-							   and cdme.stats_date = curdate() and cdme.class = '销售'
+							   and cdme.stats_date = curdate() and cdme.class = 'CC'
 							   and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 					where lp.lesson_type = 2
 						  and lpo.apply_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
@@ -134,7 +133,7 @@ left join (
              from(    
                     select
 							   lpo.apply_user_id, lpo.student_intention_id, s.student_no,
-							   concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+							   concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
 							   (case when lp.status in (3,5) and lp.solve_status <> 6 then 1 else 0 end) is_trial,
 							   (case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then 'new' else 'all_oc' end) key_attr,
 							   (case when s.coil_in in (13,22) or s.know_origin in (56,71,22,24,25,41)  then 1 else 0 end) is_recommend,
@@ -151,7 +150,7 @@ left join (
 					left join hfjydb.lesson_plan lp on lr.plan_id = lp.lesson_plan_id
 					left join hfjydb.view_student s on s.student_intention_id = lpo.student_intention_id
 					inner join bidata.charlie_dept_month_end cdme on cdme.user_id = lpo.apply_user_id 
-							   and cdme.stats_date = curdate() and cdme.class = '销售'
+							   and cdme.stats_date = curdate() and cdme.class = 'CC'
 							   and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 		     left join (
 							select min(tcp.pay_date) min_date,
@@ -164,16 +163,16 @@ left join (
 							from hfjydb.view_tms_contract_payment tcp
 							left join hfjydb.view_tms_contract tc on tc.contract_id = tcp.contract_id
 							inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tcp.submit_user_id
-									   and cdme.stats_date = curdate() and cdme.class = '销售'
+									   and cdme.stats_date = curdate() and cdme.class = 'CC'
 									   and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-							where tcp.pay_status in (2, 4)
+							where tcp.pay_status in (2,4)
 								  and tc.status <> 8
 							group by tc.contract_id, region_name
 							having max(tcp.pay_date) >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 								   and max(tcp.pay_date) < curdate()
 								   and real_pay_amount >= contract_amount
 								   ) as aa on aa.student_intention_id = lpo.student_intention_id
-											  and aa.region_name = 	concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,''))				   
+											  and aa.region_name = 	concat(ifnull(cdme.center,''),ifnull(cdme.region,''))				   
              where lp.lesson_type = 2
 				   and lp.adjust_start_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 				   and lp.adjust_start_time < curdate()
@@ -206,7 +205,7 @@ left join (
 							s.student_no,
 							s.student_intention_id,
 							s.submit_time,
-							concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+							concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
 							case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then 'new' else 'all_oc' end key_attr,
 							s.coil_in,
 							s.know_origin,
@@ -219,7 +218,7 @@ left join (
 					left join hfjydb.view_student s on s.student_intention_id = tc.student_intention_id
 					left join hfjydb.view_user_info ui on ui.user_id = tc.submit_user_id
 					inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tcp.submit_user_id
-							   and cdme.stats_date = curdate() and cdme.class = '销售'
+							   and cdme.stats_date = curdate() and cdme.class = 'CC'
 							   and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 					where tcp.pay_status in (2,4)
 						  and ui.account_type = 1
@@ -239,11 +238,11 @@ left join (
 
               from(
 		              select distinct cdme.department_name,
-			                 concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+			                 concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
 							 st.number
 		              from bidata.sales_tab st
 		              inner join bidata.charlie_dept_month_end cdme on cdme.department_name = st.group_name
-				                 and cdme.stats_date = curdate() and cdme.class = '销售'
+				                 and cdme.stats_date = curdate() and cdme.class = 'CC'
 				                 and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 								 ) as t
                group by region_name,stats_date
@@ -251,14 +250,14 @@ left join (
 
 left join (
              select date_sub(curdate(), interval 1 day) stats_date,
-                    concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+                    concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
                     count(distinct case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
                                         then ss.student_intention_id else null end) as new_req,
 	                count(distinct case when s.submit_time < date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
                                         then ss.student_intention_id else null end) as all_oc_req
              from hfjydb.ss_collection_sale_roster_action ss
              left join bidata.charlie_dept_month_end cdme on cdme.user_id = ss.user_id
-                       and cdme.stats_date = curdate() and cdme.class = '销售'
+                       and cdme.stats_date = curdate() and cdme.class = 'CC'
 		               and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
              left join hfjydb.view_student s on s.student_intention_id = ss.student_intention_id
              where ss.view_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 

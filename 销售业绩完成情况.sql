@@ -14,20 +14,19 @@ select x.stats_date 统计日期,
 from (
 
 			select  date_sub(curdate(),interval 1 day) stats_date,
-					concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
+					concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
 			from bidata.charlie_dept_month_end cdme
 			where cdme.stats_date = curdate()
-				  and cdme.class = '销售'
+				  and cdme.class = 'CC'
 				  and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+				  and cdme.department_name like 'CC%'
 			group by stats_date, region_name
-			having region_name like '上海_区'
-				   or region_name = '销售考核'
 				   ) as x
 
 left join (
               select
                       date_sub(curdate(),interval 1 day) stats_date,
-                      concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+                      concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
                       sum(tcp.sum/100) total_performance,   -- 总流水业绩
 					  dayofmonth(date_sub(curdate(),interval 1 day))/dayofmonth(last_day(date_sub(curdate(),interval 1 day))) rate, 
 	                  sum(case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
@@ -44,7 +43,7 @@ left join (
               left join hfjydb.view_tms_contract_payment tcp on tcp.contract_id = tc.contract_id
                         and tcp.pay_date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 		                and tcp.pay_date < curdate() and tcp.pay_status in (2,4)
-              where cdme.class = '销售'
+              where cdme.class = 'CC'
                     and cdme.stats_date = curdate()
                     and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
               group by region_name, stats_date
@@ -58,13 +57,12 @@ left join (
 
                from(
 		              select distinct cdme.department_name,
-			                 concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+			                 concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
 			                 st.achievement,
 							 st.number
-
 		              from bidata.sales_tab st
 		              inner join bidata.charlie_dept_month_end cdme on cdme.department_name = st.group_name
-				                 and cdme.stats_date = curdate() and cdme.class = '销售'
+				                 and cdme.stats_date = curdate() and cdme.class = 'CC'
 				                 and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
 								 ) as t
                group by region_name,stats_date
@@ -73,7 +71,7 @@ left join (
 left join (
                 select
                         date_sub(curdate(),interval 1 day) stats_date,
-                        concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
+                        concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
                         sum(tcp.sum/100) total_performance_splm   -- 上月同期总流水业绩    
                 from bidata.charlie_dept_month_end cdme
                 left join hfjydb.view_tms_contract tc on tc.submit_user_id = cdme.user_id
@@ -83,7 +81,7 @@ left join (
                           and tcp.pay_date >= date_sub(date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01'),interval 1 month)
 		                  and tcp.pay_date < date_sub(curdate(),interval 1 month)
 		                  and tcp.pay_status in (2,4)
-                where cdme.class = '销售' and cdme.stats_date = curdate()
+                where cdme.class = 'CC' and cdme.stats_date = curdate()
                       and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                 group by region_name, stats_date
 				) as xx on xx.region_name = x.region_name and xx.stats_date = x.stats_date
