@@ -2,8 +2,8 @@ select  t1.cc_order_num,  --  `CC-新签订单数指标`
 		t1.cr_order_num,  -- `CR-新签订单数指标`, 
 		t1.cc_order_num+t1.cr_order_num as total_order_num,  -- `订单量指标`
  		t2.cc_deal_num,  --  `CC-新签订单数`, 
- 		t2.cr_new_deal,  --  `CR-新签订单数`, 
- 		t2.cc_deal_num+t2.cr_new_deal as total_deal_num,  -- `总新签订单量`,
+ 		t2.cr_deal_num,  --  `CR-新签订单数`, 
+ 		t2.cc_deal_num+t2.cr_deal_num as total_deal_num,  -- `总新签订单量`,
  		t2.lm_deal_num,  --  `上月同期新签订单数`,
  		t2.cc_deal_num+t2.cr_deal_num-t2.lm_deal_num as order_num_dif, -- `环比增量`,
         (1/dayofmonth(last_day('${analyse_date}'))*dayofmonth('${analyse_date}')) as time_sched  -- `时间进度`
@@ -47,7 +47,7 @@ left join (
 						  and tc.status <> 8
 					group by tcp.contract_id, s.student_intention_id, cdme.department_name, cdme.class, tc.new_sign
 					having round(sum(tcp.sum)/100) >= round(avg((tc.sum-666)*10))
-						   and date(last_pay_date) >= trunc('${analyse_date}','MM')
+						   and date(last_pay_date) >= add_months(trunc('${analyse_date}','MM'),-1)
 						   and date(last_pay_date) <= '${analyse_date}'
 						   ) as a
                            ) as t2 on t2.stats_date = t1.stats_date
