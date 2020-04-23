@@ -41,6 +41,7 @@ from (
 			) as x
 
 
+
 left join (
              select 
                       date_sub(curdate(),interval 1 day) stats_date,
@@ -159,7 +160,7 @@ left join (
 								   sum(tcp.sum/100) real_pay_amount,
 								   (tc.sum-666) * 10 contract_amount,
 								   tcp.submit_user_id,
-								   concat(ifnull(cdme.city,''),ifnull(cdme.branch,''),ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
+								   concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name
 							from hfjydb.view_tms_contract_payment tcp
 							left join hfjydb.view_tms_contract tc on tc.contract_id = tcp.contract_id
 							inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tcp.submit_user_id
@@ -180,6 +181,7 @@ left join (
 				   ) as b
              group by region_name, stats_date
 			 ) as z on z.region_name = x.region_name and z.stats_date = x.stats_date
+
 
 
 left join (
@@ -248,19 +250,20 @@ left join (
                group by region_name,stats_date
 			   ) as xy on xy.region_name = x.region_name and xy.stats_date = x.stats_date
 
+
 left join (
              select date_sub(curdate(), interval 1 day) stats_date,
                     concat(ifnull(cdme.center,''),ifnull(cdme.region,'')) region_name,
-                    count(distinct case when s.submit_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
+                    count(distinct case when s.submit_time>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
                                         then ss.student_intention_id else null end) as new_req,
-	                count(distinct case when s.submit_time < date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
+	                count(distinct case when s.submit_time<date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
                                         then ss.student_intention_id else null end) as all_oc_req
              from hfjydb.ss_collection_sale_roster_action ss
-             left join bidata.charlie_dept_month_end cdme on cdme.user_id = ss.user_id
-                       and cdme.stats_date = curdate() and cdme.class = 'CC'
-		               and cdme.date >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
-             left join hfjydb.view_student s on s.student_intention_id = ss.student_intention_id
-             where ss.view_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
-                   and ss.view_time < curdate()
+             inner join bidata.charlie_dept_month_end cdme on cdme.user_id=ss.user_id
+                        and cdme.stats_date=curdate() and cdme.class='CC'
+		                and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
+             left join hfjydb.view_student s on s.student_intention_id=ss.student_intention_id
+             where ss.view_time>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') 
+                   and ss.view_time<curdate()
              group by region_name, stats_date
-			 ) as xz on xz.region_name = x.region_name and xz.stats_date = x.stats_date
+			 ) as xz on xz.region_name=x.region_name and xz.stats_date=x.stats_date

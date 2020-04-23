@@ -1,4 +1,4 @@
-select now() as 更新时间, concat(ifnull(t1.center,''),ifnull(t1.region,'')) as 区,
+select now() as 更新时间, t1.center 大区, t1.region 区, t1.department 部, t1.department_name 部门名称,
 	   sum(t3.number) as 抗标人数, sum(t2.total_deal_saler) as 有成单人数,
 	   sum(t3.number)-sum(t2.total_deal_saler) as 0单,
        sum(t2.deal1) as 1单, sum(t2.k_deal1) as 绩效1单, sum(t2.deal2) as 2单, sum(t2.k_deal2) as 绩效2单,
@@ -87,6 +87,7 @@ left join (
             where st.type = 'normal'
                   and st.group_name like '%CC%'
                   ) as t3 on t3.group_name=t1.department_name
+
 where not(t2.department_name is null and t3.group_name is null)
-group by t1.region 
+group by t1.department_name
 order by (sum(t3.number)-sum(t2.total_deal_saler))/sum(t3.number)

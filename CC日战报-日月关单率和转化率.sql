@@ -3,6 +3,11 @@ select  date_sub(curdate(),interval 1 day) 统计日期,
 		t2.yes_trial_deal_rate 当日试听课关单率,
 		t2.rc7_trial_deal_rate 近7日试听课关单率,
 		t2.rc30_trial_deal_rate 近30日试听课关单率,
+		t4.new_order/t3.tomonth_new_keys 当月新粒子转化率,
+		t4.oc_order/t3.tomonth_oc_keys 当月OC粒子转化率,
+		t5.rc30_order_rate 近30日新粒子总装率
+
+
 
 
 
@@ -72,22 +77,108 @@ left join(
 
 
 left join (
-			   select tpel.track_userid, tpel.intention_id, tpel.into_pool_date, ui.name distri_user
-	           from hfjydb.tms_pool_exchange_log tpel
-	           inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tpel.track_userid
-	                      and cdme.stats_date=curdate() and cdme.class = 'CC'
-	                      and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-	           left join hfjydb.view_user_info ui on ui.user_id = tpel.create_userid
-	           where date(tpel.into_pool_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-	                 and date(tpel.into_pool_date)<=date_sub(curdate(),interval 1 day)
-	           union all
-	           select tnn.user_id as track_userid, tnn.student_intention_id as intention_id, tnn.create_time as into_pool_date, 'OC分配账号' distri_user
-	           from hfjydb.tms_new_name_get_log tnn
-	           inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tnn.user_id
-	                      and cdme.stats_date=curdate() and cdme.class = 'CC'
-	                      and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-	           where tnn.create_time >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
-	                 and tnn.create_time < curdate()
-	                 and student_intention_id <> 0
+				
+				select  c.department_name,
+						count(case when s.create_time>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then c.intention_id end) tomonth_new_keys,
+						count(case when s.create_time<date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then c.intention_id end) tomonth_oc_keys
 
-)
+
+
+				from(
+					   select tpel.intention_id, cdme.department_name
+			           from hfjydb.tms_pool_exchange_log tpel
+			           inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tpel.track_userid
+			                      and cdme.stats_date=curdate() and cdme.class = 'CC'
+			                      and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+			           where date(tpel.into_pool_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+			                 and date(tpel.into_pool_date)<=date_sub(curdate(),interval 1 day)
+			           union all
+			           select tnn.student_intention_id, cdme.department_name
+			           from hfjydb.tms_new_name_get_log tnn
+			           inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tnn.user_id
+			                      and cdme.stats_date=curdate() and cdme.class = 'CC'
+			                      and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+			           where tnn.create_time>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+			                 and tnn.create_time<curdate()
+			                 and student_intention_id<>0
+			                 ) as c
+				left join hfjydb.view_student s on s.student_intention_id=c.intention_id
+				group by c.department_name
+				) as t3 on t3.department_name=t1.department_name
+
+
+left join (
+				
+				select d.department_name,
+					   count(case when d.is_new=1 then d.contract_id end) as new_order,
+				       count(case when d.is_new=0 then d.contract_id end) as oc_order
+
+				from(
+
+						select max(tcp.pay_date) max_date,
+							   tc.contract_id,
+							   tc.student_intention_id,
+							   sum(tcp.sum/100) real_pay_amount,
+							   (tc.sum-666)*10 contract_amount,
+							   tcp.submit_user_id,
+							   case when s.create_time>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01') then 1 else 0 end is_new,
+							   cdme.department_name
+						from hfjydb.view_tms_contract_payment tcp
+						left join hfjydb.view_tms_contract tc on tc.contract_id=tcp.contract_id
+						left join hfjydb.view_student s on s.student_intention_id=tc.student_intention_id
+						inner join bidata.charlie_dept_month_end cdme on cdme.user_id=tcp.submit_user_id
+								   and cdme.stats_date=curdate() and cdme.class='CC'
+								   and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+						where tcp.pay_status in (2,4)
+							  and tc.status<>8
+						group by tc.contract_id, cdme.department_name
+						having max(tcp.pay_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+							   and max(tcp.pay_date)<curdate()
+							   and real_pay_amount>=contract_amount
+							   ) as d 
+				group by d.department_name
+				) as t4 on t4.department_name=t1.department_name
+
+
+left join (
+				
+			select f.department_name,
+			       count(distinct f.contract_id)/count(distinct f.intention_id) as rc30_order_rate
+
+
+			from(
+
+					select tpel.intention_id, cdme.department_name, e.contract_id
+			        from hfjydb.tms_pool_exchange_log tpel
+			        left join hfjydb.view_student s on s.student_intention_id = tpel.intention_id
+			        inner join bidata.charlie_dept_month_end cdme on cdme.user_id=tpel.track_userid
+			                   and cdme.stats_date=curdate() and cdme.class='CC'
+			                   and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+			        left join (
+			        				select min(tcp.pay_date) min_date,
+										   tc.contract_id,
+										   tc.student_intention_id,
+										   sum(tcp.sum/100) real_pay_amount,
+										   (tc.sum-666) * 10 contract_amount,
+										   tcp.submit_user_id,
+										   cdme.department_name
+									from hfjydb.view_tms_contract_payment tcp
+									left join hfjydb.view_tms_contract tc on tc.contract_id = tcp.contract_id
+									inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tcp.submit_user_id
+											   and cdme.stats_date=curdate() and cdme.class = 'CC'
+											   and cdme.date>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+									where tcp.pay_status in (2,4)
+										  and tc.status<>8
+									group by tc.contract_id, cdme.department_name
+									having max(tcp.pay_date)>=date_sub(curdate(),interval 30 day)
+										   and max(tcp.pay_date)<=date_sub(curdate(),interval 1 day)
+										   and real_pay_amount>=contract_amount
+										   ) as e on e.student_intention_id=tpel.intention_id
+			                                         and e.department_name=cdme.department_name
+
+			        where  s.create_time>=date_sub(curdate(),interval 30 day)
+				           and s.create_time<=date_sub(curdate(),interval 1 day)
+				    group by tpel.intention_id, cdme.department_name
+				    ) as f
+			group by f.department_name
+			) as t5 on t5.department_name=t1.department_name

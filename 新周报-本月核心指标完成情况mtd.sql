@@ -1,24 +1,16 @@
 select  date_sub(curdate(),interval 1 day) as stats_date,
-        t1.department_name 部门, 
-       t1.region 区,
-       t1.department 部,
-        t2.number 月初抗标人数,t2.order_number 订单数指标, t3.tomonth_order 当月完成订单数, t3.lastmonth_order 上月同期订单数,
-        t3.tomonth_amount 当月完成订单额, t3.lastmonth_amount 上月同期订单额, t3.total_deal_saler 当月出单销售人数, t3.tomonth_rec_order 当月转介绍订单数, t4.new_rec_keys 当月转介绍线索量
+        t1.department_name 部门, t1.center 大区, t1.region 区, t1.department 部,
+        t2.number 月初抗标人数,t2.order_number 订单数指标, t3.tomonth_order 当月完成订单数, t3.tomonth_k_order 当月绩效订单数, 
+        t3.lastmonth_k_order 上月同期绩效订单数, 
+        t3.tomonth_amount 当月完成订单额, t3.lastmonth_amount 上月同期订单额, t3.total_deal_saler 当月出单销售人数, 
+        t3.tomonth_rec_order 当月转介绍订单数, t4.new_rec_keys 当月转介绍线索量
 
 from(
 
-      select cdme.class, cdme.branch, cdme.center, 
-             case when cdme.department_name like '销售考核_组' then '考核部'
-                  when cdme.department_name like '%待分配部%' then '待分配部'
-             else cdme.region end region,
-             case when cdme.department_name like '销售考核_组' then cdme.grp 
-                  when cdme.department_name like '%待分配%' then '待分配部'
-             else cdme.department end department,
-             cdme.department_name
+      select cdme.center, cdme.region, cdme.department, cdme.department_name
       from bidata.charlie_dept_month_end cdme 
-      where cdme.stats_date = curdate() and cdme.class = '销售'
-            and cdme.department_name like '销售_区_部'
-            or cdme.department_name like '销售考核_组'
+      where cdme.stats_date = curdate() and cdme.class = 'CC'
+            and cdme.department_name like 'CC%'
       group by cdme.department_name
       ) as t1
 
@@ -28,18 +20,21 @@ left join (
                     st.order_number,
                     st.manager
             from bidata.sales_tab st
-            where st.type = 'normal' and st.group_name like '%销售%'
+            where st.type = 'normal' and st.group_name like 'CC%'
             ) as t2 on t2.group_name=t1.department_name
 
 
 left join (
             select a.department_name,
-                   count(case when date(a.max_pay_date)>=date_sub(date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01'),interval 1 month)
+                   sum(case when date(a.max_pay_date)>=date_sub(date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01'),interval 1 month)
                                    and date(a.max_pay_date)<=date_sub(date_sub(curdate(),interval 1 day),interval 1 month)
-                              then a.contract_id else null end) as lastmonth_order,
+                              then a.k_order else null end) as lastmonth_k_order,
                    count(case when date(a.max_pay_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                                    and date(a.max_pay_date)<=date_sub(curdate(),interval 1 day)
                               then a.contract_id else null end) as tomonth_order,
+                   sum(case when date(a.max_pay_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
+                                 and date(a.max_pay_date)<=date_sub(curdate(),interval 1 day)
+                              then a.k_order else null end) as tomonth_k_order,
                    count(case when date(a.max_pay_date)>=date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                                    and date(a.max_pay_date)<=date_sub(curdate(),interval 1 day) 
                                    and (a.coil_in in (13,22) or a.know_origin in (56,71,22,24,25,41))
@@ -61,7 +56,8 @@ left join (
                                     tcp.contract_id,
                                     tc.submit_user_id,
                                     s.coil_in,
-                                    s.know_origin,        
+                                    s.know_origin,
+                                    case when tc.period>=60 then 1 else 0.5 end k_order,       
                                     max(tcp.pay_date) as max_pay_date,
                                     sum(tcp.sum/100) real_pay_sum, 
                                     (tc.sum-666)*10 contract_amount
@@ -70,7 +66,7 @@ left join (
                             left join hfjydb.view_user_info ui on ui.user_id = tc.submit_user_id
                             left join hfjydb.view_student s on s.student_intention_id = tc.student_intention_id
                             inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tc.submit_user_id
-                                       and cdme.stats_date = curdate() and cdme.class = '销售'    
+                                       and cdme.stats_date = curdate() and cdme.class = 'CC'    
                             where tcp.pay_status in (2,4) 
                                   and tc.status <> 8  -- 剔除合同终止和废弃
                                   and ui.account_type = 1  -- 剔除测试数据
@@ -94,7 +90,7 @@ left join (
                        select tpel.track_userid, tpel.intention_id, tpel.into_pool_date, ui.name distri_user
                        from hfjydb.tms_pool_exchange_log tpel
                        inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tpel.track_userid
-                                and cdme.stats_date = curdate() and cdme.class = '销售'
+                                and cdme.stats_date = curdate() and cdme.class = 'CC'
                        left join hfjydb.view_user_info ui on ui.user_id = tpel.create_userid
                        where date(tpel.into_pool_date) >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                            and date(tpel.into_pool_date) <= date_sub(curdate(),interval 1 day)
@@ -102,7 +98,7 @@ left join (
                        select tnn.user_id as track_userid, tnn.student_intention_id as intention_id, tnn.create_time as into_pool_date, 'OC分配账号' distri_user
                        from hfjydb.tms_new_name_get_log tnn
                        inner join bidata.charlie_dept_month_end cdme on cdme.user_id = tnn.user_id
-                                and cdme.stats_date = curdate() and cdme.class = '销售'
+                                and cdme.stats_date = curdate() and cdme.class = 'CC'
                        where date(tnn.create_time) >= date_format(date_sub(curdate(),interval 1 day),'%Y-%m-01')
                              and date(tnn.create_time) <= date_sub(curdate(),interval 1 day)
                              and student_intention_id <> 0
@@ -110,7 +106,7 @@ left join (
 
                left join hfjydb.view_student s on s.student_intention_id = a.intention_id
                left join bidata.charlie_dept_month_end cdme on cdme.user_id = a.track_userid
-                         and cdme.stats_date = curdate() and cdme.class='销售'
+                         and cdme.stats_date = curdate() and cdme.class='CC'
 
                group by department_name
                ) as t4 on t4.department_name=t1.department_name
