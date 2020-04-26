@@ -5,7 +5,7 @@ select  t1.cc_order_num,  --  `CC-新签订单数指标`
  		t2.cr_deal_num,  --  `CR-新签订单数`, 
  		t2.cc_deal_num+t2.cr_deal_num as total_deal_num,  -- `总新签订单量`,
  		t2.lm_deal_num,  --  `上月同期新签订单数`,
- 		t2.cc_deal_num+t2.cr_deal_num-t2.lm_deal_num as order_num_dif, -- `环比增量`,
+ 		t2.cc_deal_num+t2.cr_deal_num-t2.lm_deal_num as order_num_diff, -- `环比增量`,
         (1/dayofmonth(last_day('${analyse_date}'))*dayofmonth('${analyse_date}')) as time_sched  -- `时间进度`
 		
 
@@ -23,7 +23,7 @@ left join (
 			select  '${analyse_date}' as stats_date,
                     count(case when a.class='CC' and date(a.last_pay_date)>=trunc('${analyse_date}','MM') then a.contract_id end) as cc_deal_num,
 			        count(case when a.class='CR' and a.new_sign=1 and date(a.last_pay_date)>=trunc('${analyse_date}','MM') then a.contract_id end) as cr_deal_num,
-			        count(case when date(a.last_pay_date)<=date_add(add_months(date_add('${analyse_date}',1),-1),-1) and new_sign=1 then a.contract_id end) as lm_deal_num
+			        count(case when date(a.last_pay_date)<=date_add(add_months(date_add('${analyse_date}',1),-1),-1) and a.new_sign=1 then a.contract_id end) as lm_deal_num
 
 			from(
 
@@ -41,12 +41,12 @@ left join (
 					left join dw_hf_mobdb.dw_view_user_info ui on ui.user_id = tc.submit_user_id
 					inner join dt_mobdb.dt_charlie_dept_month_end cdme on cdme.user_id = tcp.submit_user_id
 							   and cdme.stats_date = current_date() 
-                               and cdme.`date` >=trunc('${analyse_date}','MM')
+                               and cdme.`date` >= add_months(trunc('${analyse_date}','MM'),-1)
 					where tcp.pay_status in (2,4)
 						  and ui.account_type = 1
 						  and tc.status <> 8
 					group by tcp.contract_id, s.student_intention_id, cdme.department_name, cdme.class, tc.new_sign
-					having round(sum(tcp.sum)/100) >= round(avg((tc.sum-666)*10))
+					having round(sum(tcp.sum)/100,0) >= round(avg((tc.sum-666)*10),0)
 						   and date(last_pay_date) >= add_months(trunc('${analyse_date}','MM'),-1)
 						   and date(last_pay_date) <= '${analyse_date}'
 						   ) as a
